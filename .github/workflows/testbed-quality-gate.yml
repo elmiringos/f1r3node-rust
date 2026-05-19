@@ -56,7 +56,7 @@ on:
         type: boolean
 
 env:
-  LOG_HOST_PATH: /tmp/asi-chain-logs/${{ github.run_id }}
+  LOG_HOST_PATH: /tmp/asi-chain-logs/${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
 

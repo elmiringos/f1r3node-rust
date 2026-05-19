@@ -1,0 +1,61 @@
+# Testbed Runner Health Check
+#
+# Verifies the self-hosted runner has all prerequisites working without sudo.
+# Run this after provisioning a new machine or after any runner maintenance
+# to confirm it's ready before triggering a real suite.
+#
+# Also runs on a daily schedule to catch regressions (k3s restart, docker
+# socket permission loss, disk full, etc.).
+
+name: Testbed Runner Health
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  health:
+    name: Runner health check
+    runs-on: [self-hosted, linux, x64, testbed]
+    timeout-minutes: 10
+    steps:
+      - name: Docker
+        run: |
+          docker ps
+          echo "Docker OK"
+
+      - name: kubectl / k3s node
+        run: |
+          kubectl get nodes
+          echo "kubectl OK"
+
+      - name: k3s containerd socket
+        run: |
+          k3s ctr images ls > /dev/null
+          echo "k3s ctr OK"
+
+      - name: Go
+        run: |
+          go version
+          echo "Go OK"
+
+      - name: Disk space
+        run: |
+          df -h /
+          AVAIL=$(df --output=avail -BG / | tail -1 | tr -d 'G ')
+          echo "Available: ${AVAIL} GiB"
+          [ "$AVAIL" -ge 200 ] || { echo "ERROR: less than 200 GiB free — not safe to run suites"; exit 1; }
+
+      - name: Summary
+        run: |
+          echo "## Runner Health" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Check | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Docker | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| kubectl | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| k3s ctr | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Go | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Disk ≥ 200 GiB | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          go version >> "$GITHUB_STEP_SUMMARY"
+          df -h / >> "$GITHUB_STEP_SUMMARY"
